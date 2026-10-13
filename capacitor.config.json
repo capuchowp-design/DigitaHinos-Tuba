@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.capuchowp.tubabounce",
+  "appName": "Tuba Bounce",
+  "webDir": "www",
+  "backgroundColor": "#0a080e",
+  "server": {
+    "androidScheme": "https"
+  }
+}
