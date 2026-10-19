@@ -10,6 +10,12 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png">
     <meta name="theme-color" content="#9c6bf2">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script>
+/* diagnóstico: mostra na tela qualquer erro de JavaScript (útil no celular) */
+(function(){ function show(m){ try{ var d=document.getElementById('errBox'); if(!d){ d=document.createElement('div'); d.id='errBox'; d.style.cssText='position:fixed;left:6px;right:6px;bottom:6px;z-index:99999;background:#7a1010;color:#fff;font:12px/1.35 monospace;padding:8px 10px;border-radius:8px;max-height:40vh;overflow:auto;white-space:pre-wrap'; d.onclick=function(){ d.remove(); }; (document.body||document.documentElement).appendChild(d); } d.textContent+=m+'\n'; }catch(e){} }
+window.addEventListener('error',function(e){ show('Erro: '+(e.message||'?')+' ('+String(e.filename||'').split('/').pop()+':'+e.lineno+')'); });
+window.addEventListener('unhandledrejection',function(e){ show('Erro (promessa): '+((e.reason&&e.reason.message)||e.reason)); }); })();
+</script>
     <script src="pro-config.js"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/fontsource/fonts/inter@5/latin.css');
@@ -766,6 +772,7 @@
     <div class="pb-head"><h2>⭐ Modo Pro</h2><button class="pb-x" id="proClose" data-close aria-label="Fechar">✕</button></div>
     <div class="pb-body" id="proBody"></div>
   </div>
+</div>
 <div class="pb-modal" id="mHinos" hidden>
   <div class="pb-sheet wide">
     <div class="pb-head"><h2>Hinos</h2><button class="pb-x" data-close>✕</button></div>
