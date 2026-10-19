@@ -1368,6 +1368,8 @@ async function applyNotes(notes, duration, voiceNames, opts){
     buildVoiceSel(voiceNames, opts&&opts.satbDown);
     // Soprano, contralto, tenor e baixo soam uma oitava abaixo do escrito para caber no alcance da tuba
     if(state.shiftIds.length) notes.forEach(n=>{ if(state.shiftIds.includes(n.track||0)) n.midi=Math.max(0,n.midi-12); });
+    // o som acompanha a digitação mostrada: nota fora do alcance do instrumento sobe/desce de oitava
+    notes.forEach(n=>{ n.m1=n.midi; n.midi=tubaPitch(n.m1); });
     let mn=127,mx=0; notes.forEach(n=>{if(n.midi<mn)mn=n.midi;if(n.midi>mx)mx=n.midi;});
     state.lowestNote=Math.max(21,mn-2); state.highestNote=Math.min(108,mx+2);
     while(state.highestNote-state.lowestNote<23){ if(state.lowestNote>21) state.lowestNote--; if(state.highestNote<108) state.highestNote++; }
@@ -1566,7 +1568,12 @@ function drawGrid(w,h,hl,pps){
 // Cada nota vira: harmônico (posição dos lábios) + combinação de válvulas. Válvulas: 1 = −2 semitons, 2 = −1, 3 = −3, 4 = −5.
 // As válvulas apertadas descem sobre o corpo da tuba (mão direita, verde) e a tubulação extra de cada válvula acende.
 const SOL=['Dó','Dó♯','Ré','Mi♭','Mi','Fá','Fá♯','Sol','Sol♯','Lá','Si♭','Si'], LET=[0,0,1,2,2,3,3,4,4,5,6,6], ACC=['','♯','','♭','','','♯','','♯','','♭',''];
-const TUBA_LO=23, TUBA_HI=70;      // Si0 … Si♭4 (tabela de digitação BBb)
+// Configuração do instrumento: nº de pistões (4 ou 3) e afinação (Si♭ = BBb, Dó = CC). Guardada neste aparelho.
+const tubaCfg={valves:4,key:'bb'}; try{ const v=JSON.parse(localStorage.getItem('tubaCfg')||'null'); if(v&&(v.valves===3||v.valves===4)&&(v.key==='bb'||v.key==='c')){ tubaCfg.valves=v.valves; tubaCfg.key=v.key; } }catch(e){}
+const TUBA_LO4=23, TUBA_HI4=70;      // Si0 … Si♭4 (tabela de digitação BBb, 4 válvulas)
+const TUBA_LO3=28;                    // 3 válvulas: o mais grave é Mi1 (1+2+3 sobre o 2º harmônico)
+const tubaKS=()=>tubaCfg.key==='c'?2:0;                         // tuba em Dó soa um tom acima da Si♭ com a mesma digitação
+const tubaLo=()=>(tubaCfg.valves===4?TUBA_LO4:TUBA_LO3)+tubaKS(), tubaHi=()=>TUBA_HI4+tubaKS();
 // Tabela: nota MIDI → combinações de válvulas (a primeira é a principal; as demais são alternativas)
 const TUBA_CHART={23:[[1,2,3,4],[2,3]],24:[[1,2,3,4]],25:[[1,3,4]],26:[[2,3,4]],27:[[1,4],[1,2,4]],28:[[2,4],[1,2,3]],
 29:[[4],[1,3]],30:[[2,3]],31:[[1,2],[3]],32:[[1]],33:[[2]],34:[[],[1,2,4],[1,4]],35:[[2,4],[1,2,3]],
@@ -1577,17 +1584,22 @@ const TUBA_CHART={23:[[1,2,3,4],[2,3]],24:[[1,2,3,4]],25:[[1,3,4]],26:[[2,3,4]],
 65:[[]],66:[[2,3]],67:[[1,2]],68:[[1]],69:[[2]],70:[[]]};
 const TUBA_PART={34:2,41:3,46:4,50:5,53:6,56:7,58:8,60:9,62:10,64:11,65:12,67:13,68:14,69:15,70:16};
 const VDROP={1:2,2:1,3:3,4:5};
-function tubaPitch(m){ let w=m; while(w>TUBA_HI) w-=12; while(w<TUBA_LO) w+=12; return w; }
+function tubaPitch(m){ const lo=tubaLo(), hi=tubaHi(); let w=m; while(w>hi) w-=12; while(w<lo) w+=12; return w; }
+// 3 pistões (tabela do método para tuba em Si♭): harmônico mais próximo acima da nota, com 0, 2, 1, 1+2, 2+3, 1+3 ou 1+2+3 (queda de 0 a 6 semitons)
+const TUBA_PL=[34,41,46,50,53,56,58,60,62,64,65,67,68,69,70];
+const COMBO3={0:[],1:[2],2:[1],3:[1,2],4:[2,3],5:[1,3],6:[1,2,3]};
+function tubaChart3(q){ const P=TUBA_PL.find(x=>x>=q&&x-q<=6); if(P===undefined) return [[]]; const d=P-q, r=[COMBO3[d]]; if(d===3) r.push([3]); return r; }
+function tubaChartFor(q){ return tubaCfg.valves===4?(TUBA_CHART[q]||[[]]):tubaChart3(q); }
 function writtenOf(m){ return tubaPitch(m); }      // tuba em Si♭ lida em clave de Fá, no som real
 function tubaFinger(m){
-    const p=tubaPitch(m), c=TUBA_CHART[p]||[[]], v=c[0];
-    const base=p+v.reduce((a,x)=>a+VDROP[x],0), n=TUBA_PART[base]||0;
+    const p=tubaPitch(m), q=p-tubaKS(), c=tubaChartFor(q), v=c[0];
+    const base=q+v.reduce((a,x)=>a+VDROP[x],0), n=TUBA_PART[base]||0;
     return {p,n,d:base-p,v,alts:c.slice(1)};
 }
 function tubaValveText(m){ const v=tubaFinger(m).v; return v.length?v.join('-'):'0'; }
 const claFX=[];
 const TC=355;                                   // eixo da tuba dentro da caixa 549×953
-const VX=[TC-54,TC-18,TC+18,TC+54];             // 4 pistões
+const VX4=[TC-54,TC-18,TC+18,TC+54], VX3=[TC-36,TC,TC+36];             // posições dos pistões (4 ou 3)
 const BASS_CLEF_PATH='M0.15,-0.1 C0.1,-1.25 2.35,-1.4 2.45,0.35 C2.5,1.7 1.1,2.7 -0.9,3.15';
 function drawBassClefCanvas(c,x,yF,u,col){
     c.save(); c.translate(x,yF); c.scale(u,u); c.fillStyle=col; c.strokeStyle=col; c.lineCap='round';
@@ -1608,6 +1620,7 @@ function drawPiano(){
     c.clearRect(0,0,w,h);
     const act=state.pianoKeys.filter(k=>k.isActive), top=act[0], ac=top?top.activeColor:'#b79cff';
     const pw=top?writtenOf(top.midi):null, fg=top?tubaFinger(top.midi):null, pressed=new Set(fg?fg.v:[]);
+    const NV=tubaCfg.valves, VX=NV===4?VX4:VX3;
     const ink=light?'#5a4a8a':'#b9aee0', s=Math.min(w/549,h/953), ox=(w-549*s)/2, oy=(h-953*s)/2, pos=[];
     const now=performance.now()/1000;
     if(top){ const g=c.createRadialGradient(ox+TC*s,oy+620*s,0,ox+TC*s,oy+620*s,Math.max(w,h)*0.55); g.addColorStop(0,ac+'44'); g.addColorStop(1,'transparent'); c.fillStyle=g; c.fillRect(0,0,w,h); }
@@ -1643,7 +1656,7 @@ function drawPiano(){
     }
     // --- tubos de afinação (um por válvula): acendem quando a válvula desce ---
     const slides=[[0,52,64],[1,40,52],[2,64,78],[3,86,96]];
-    slides.forEach(([i,dx,dy])=>{
+    slides.filter(sl=>sl[0]<NV).forEach(([i,dx,dy])=>{
         const x=VX[i], on=pressed.has(i+1);
         const p=new Path2D(); p.moveTo(x,690); p.lineTo(x,690+dy); p.lineTo(x+(i<2?-1:1)*dx*.0,690+dy);
         const q=new Path2D(); q.moveTo(x-7,688); q.lineTo(x-7,688+dy); q.quadraticCurveTo(x-7,694+dy+dx*.2,x+7,694+dy+dx*.2); q.lineTo(x+7,688);
@@ -1653,8 +1666,8 @@ function drawPiano(){
     });
     // --- corpo das válvulas ---
     const vb=c.createLinearGradient(TC-80,0,TC+80,0); vb.addColorStop(0,T.dark); vb.addColorStop(.4,T.hi); vb.addColorStop(.7,T.mid); vb.addColorStop(1,T.dark);
-    c.fillStyle=vb; c.strokeStyle=T.edge; c.lineWidth=3; c.beginPath(); c.roundRect(TC-76,540,152,152,10); c.fill(); c.stroke();
-    for(let i=0;i<4;i++){
+    c.fillStyle=vb; c.strokeStyle=T.edge; c.lineWidth=3; c.beginPath(); c.roundRect(TC-(NV===4?76:58),540,NV===4?152:116,152,10); c.fill(); c.stroke();
+    for(let i=0;i<NV;i++){
         const x=VX[i], on=pressed.has(i+1), dy=on?24:0;
         // haste do pistão
         c.fillStyle='#cfd2d6'; c.strokeStyle='#4a4d52'; c.lineWidth=2; c.beginPath(); c.roundRect(x-5,500+dy,10,48,3); c.fill(); c.stroke();
@@ -1689,7 +1702,7 @@ function drawPiano(){
             c.font='700 12px Inter,sans-serif'; c.fillStyle=ink; c.fillText('OUTRAS DIGITAÇÕES',20,418);
             fg.alts.slice(0,3).forEach((av,ri)=>{
                 const y0=432+ri*62, set=new Set(av);
-                for(let i=0;i<4;i++){
+                for(let i=0;i<NV;i++){
                     const x=32+i*30, on=set.has(i+1), dy=on?9:0;
                     c.fillStyle='#cfd2d6'; c.strokeStyle='#4a4d52'; c.lineWidth=1.2; c.beginPath(); c.roundRect(x-2.5,y0+8+dy,5,16,2); c.fill(); c.stroke();
                     c.fillStyle=T.mid; c.strokeStyle=T.edge; c.lineWidth=1.5; c.beginPath(); c.roundRect(x-9,y0+26,18,22,4); c.fill(); c.stroke();
@@ -1713,6 +1726,30 @@ function drawPiano(){
         c.globalAlpha=f.l; c.fillStyle=f.col; c.shadowColor=f.col; c.shadowBlur=12; c.font='bold 20px sans-serif'; c.textAlign='left'; c.fillText(f.ch,f.x,f.y); }
     c.globalAlpha=1; c.shadowBlur=0; c.textAlign='start';
 }
+
+
+// ---- seletor do instrumento: 4 ou 3 pistões, Si♭ ou Dó ----
+function tubaRefresh(){
+    try{ localStorage.setItem('tubaCfg',JSON.stringify(tubaCfg)); }catch(e){}
+    if(!state.midiLoaded){ drawPiano(); return; }
+    state.notes.forEach(n=>{ if(n.m1===undefined) n.m1=n.midi; n.midi=tubaPitch(n.m1); });
+    let mn=127,mx=0; state.notes.forEach(n=>{if(n.midi<mn)mn=n.midi;if(n.midi>mx)mx=n.midi;});
+    state.lowestNote=Math.max(21,mn-2); state.highestNote=Math.min(108,mx+2);
+    while(state.highestNote-state.lowestNote<23){ if(state.lowestNote>21) state.lowestNote--; if(state.highestNote<108) state.highestNote++; }
+    buildPianoKeys();
+    if(state.isPlaying){ const cp=state.currentTime; pausePlayback(); state.pausedAt=cp; startPlayback(); } else drawScene();
+}
+window.addEventListener('DOMContentLoaded',()=>{
+    const box=pianoCanvas.parentElement; if(getComputedStyle(box).position==='static') box.style.position='relative';
+    const wrap=document.createElement('div'); wrap.style.cssText='position:absolute;top:8px;right:8px;z-index:5;display:flex;flex-direction:column;gap:6px;align-items:flex-end';
+    const mk=(id,label,opts,val,fn)=>{ const s=document.createElement('select'); s.id=id; s.setAttribute('aria-label',label);
+        s.style.cssText='background:rgba(5,10,16,.7);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 8px;font:600 13px Inter,sans-serif';
+        opts.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if(String(v)===String(val)) o.selected=true; s.appendChild(o); });
+        s.addEventListener('change',()=>fn(s.value)); wrap.appendChild(s); };
+    mk('tubaValves','Número de pistões',[[4,'Tuba de 4 pistões'],[3,'Tuba de 3 pistões']],tubaCfg.valves,v=>{ tubaCfg.valves=+v; tubaRefresh(); });
+    mk('tubaKey','Afinação da tuba',[['bb','Tuba em Si♭'],['c','Tuba em Dó']],tubaCfg.key,v=>{ tubaCfg.key=v; tubaRefresh(); });
+    box.appendChild(wrap);
+});
 
 function noteX(midi,cw){ return (midi-state.lowestNote)*cw/(state.highestNote-state.lowestNote+1); }
 function noteW(midi,cw){ return cw/(state.highestNote-state.lowestNote+1); }
