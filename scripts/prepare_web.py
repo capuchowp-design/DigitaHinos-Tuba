@@ -16,7 +16,7 @@ if os.path.isdir(WWW):
     shutil.rmtree(WWW)
 os.makedirs(VENDOR)
 
-for name in ["index.html", "manifest.json", "privacy.html"]:
+for name in ["index.html", "manifest.json", "privacy.html", "pro-config.js"]:
     src = os.path.join(ROOT, name)
     if os.path.exists(src):
         shutil.copy(src, WWW)
