@@ -3270,6 +3270,20 @@ function pbBuildScore(opts){
     const staves=[{clef:'bass',base:18,mid:22,ev:pbStaffEvents(notes,M,ts,total)}];   // tuba: só clave de Fá
 
     staves.forEach(st=>{
+        // 8vb: notas graves (a partir da 2ª linha suplementar abaixo da pauta) são escritas uma oitava acima, perto da pauta, com a indicação 8vb (tocar uma oitava abaixo)
+        if(opts.o8!==false){
+            const up=ev=>{ ev.o8=true; ev.notes.forEach(h=>{ h.d+=7; h.o+=1; }); };
+            st.ev.forEach(ev=>{
+                if(ev.rest||!ev.notes.length) return;
+                const hi=ev.notes[ev.notes.length-1].d, lo=ev.notes[0].d;
+                if(lo<=st.base-4 && hi+7<=st.base+12) up(ev);
+            });
+            const ne=st.ev.filter(e=>!e.rest&&e.notes.length);   // evento isolado entre dois 8vb sobe junto
+            for(let i=1;i<ne.length-1;i++){
+                const ev=ne[i]; if(ev.o8||!ne[i-1].o8||!ne[i+1].o8) continue;
+                if(ev.notes[0].d<=st.base-2 && ev.notes[ev.notes.length-1].d+7<=st.base+12) up(ev);
+            }
+        }
         let state={}, lastM=-1;
         st.ev.forEach(ev=>{
             if(ev.m!==lastM){ state={}; lastM=ev.m; }
@@ -3340,7 +3354,8 @@ function pbBuildScore(opts){
     systems.forEach(sys=>{
         let minD=1e9; staves[0].ev.filter(ev=>sys.ms.some(ms=>ms.m===ev.m)).forEach(ev=>{ if(!ev.rest) ev.notes.forEach(h=>{ minD=Math.min(minD,h.d); }); });
         const low=minD<1e9?Math.max(0,(staves[0].base-minD))*SP/2:0;
-        sys.vy=4*SP+Math.max(26,low+22);
+        const has8=staves[0].ev.some(ev=>ev.o8&&sys.ms.some(ms=>ms.m===ev.m));
+        sys.vy=4*SP+Math.max(26,low+22)+(has8?14:0);
         sys.h=VAL?44+sys.vy+24:44+4*SP+34+22;
     });
     const svgs=[]; let page=null, y=0, pageNo=0;
@@ -3422,6 +3437,23 @@ function pbBuildScore(opts){
             const top=tops[k], yOf=d=>stepY(st,top,d), midY=top+2*SP;
             const evs=st.ev.filter(ev=>sys.ms.some(ms=>ms.m===ev.m));
             const X=ev=>colX.get(ev.m+':'+ev.pos);
+            { // indicação 8vb (oitava abaixo) com linha pontilhada, sob a pauta
+                const runs=[]; let cr=null;
+                evs.forEach(ev=>{
+                    if(ev.rest) return;
+                    if(ev.o8){ const yb=yOf(ev.notes[0].d); if(!cr){ cr={a:ev,b:ev,y:yb}; } else { cr.b=ev; cr.y=Math.max(cr.y,yb); } }
+                    else if(cr){ runs.push(cr); cr=null; }
+                });
+                if(cr) runs.push(cr);
+                runs.forEach(r=>{
+                    const x1=X(r.a)-HRX*1.6, x2=X(r.b)+HRX*1.9, yy=Math.max(top+4*SP+SP*2.2,r.y+SP*2.2);
+                    const t=pbEl(pg,'text',{x:x1,y:yy+4,'font-family':'Georgia,Times New Roman,serif','font-size':SP*1.7,'font-style':'italic',fill:INK});
+                    t.textContent='8';
+                    const ts2=pbEl(pg,'tspan',{'font-size':SP*1.15,dy:-SP*.15}); ts2.textContent='vb'; t.appendChild(ts2);
+                    pbEl(pg,'line',{x1:x1+SP*3.1,y1:yy,x2:x2,y2:yy,stroke:INK,'stroke-width':1,'stroke-dasharray':'1.8 2.4'});
+                    pbEl(pg,'line',{x1:x2,y1:yy,x2:x2,y2:yy-SP*.9,stroke:INK,'stroke-width':1});
+                });
+            }
             const doneGroups=new Set();
             evs.forEach(ev=>{
                 if(ev.rest){ pbRest(pg,ev,X(ev),top,SP,M,INK); return; }
