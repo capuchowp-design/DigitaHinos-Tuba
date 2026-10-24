@@ -1,4 +1,4 @@
-# Tuba Bounce
+# DigitaHinos Tuba
 
 Visualizador MIDI com tuba em Si♭ animada (4 pistões, tabela de digitação completa de Si0 a Si♭4, com as digitações alternativas em pistões pequenos): as válvulas descem sobre o corpo da tuba (e a tubulação extra de cada válvula acende), com o harmônico, a pauta em clave de Fá e o compositor.
 

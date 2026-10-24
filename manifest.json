@@ -1,6 +1,6 @@
 {
-  "name": "Tuba Bounce - Visualizador MIDI",
-  "short_name": "Tuba Bounce",
+  "name": "DigitaHinos Tuba - Visualizador MIDI",
+  "short_name": "DigitaHinos Tuba",
   "description": "Visualizador MIDI com tuba animado",
   "start_url": "./index.html",
   "display": "standalone",

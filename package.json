@@ -1,8 +1,8 @@
 {
-  "name": "tubabounce",
+  "name": "digitahinos-tuba",
   "version": "1.0.0",
   "private": true,
-  "description": "Tuba Bounce - visualizador MIDI com tuba animada",
+  "description": "DigitaHinos Tuba - visualizador MIDI com tuba animada",
   "dependencies": {
     "@capacitor/android": "^7.0.0",
     "@capacitor/core": "^7.0.0",
