@@ -4083,5 +4083,90 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
 })();
 
 </script>
+    <script>
+/* ============================================================================
+   INTEGRAÇÃO DE ANÚNCIOS RECOMPENSADOS — UNITY LEVELPLAY (CAPACITOR)
+   ========================================================================== */
+(function() {
+    let ironSourceSDK = null;
+
+    // Inicializa o SDK do Unity LevelPlay se estiver rodando no aplicativo Android
+    async function initUnityAds() {
+        const C = window.Capacitor;
+        if (C && C.isNativePlatform && C.isNativePlatform()) {
+            try {
+                ironSourceSDK = (C.Plugins && C.Plugins.IronSource) || 
+                                (typeof C.registerPlugin === 'function' && C.registerPlugin('IronSource'));
+                
+                if (ironSourceSDK && PRO_CFG.unityAppKey) {
+                    await ironSourceSDK.initialize({
+                        appKey: PRO_CFG.unityAppKey,
+                        userConsent: true
+                    });
+                    console.log('Unity LevelPlay inicializado com sucesso.');
+                }
+            } catch (e) {
+                console.error('Erro ao carregar o SDK da Unity:', e);
+            }
+        }
+    }
+
+    // Função para verificar se um hino PRO está temporariamente liberado por 1 hora
+    window.isHinoTempUnlocked = function(hinoNum) {
+        try {
+            const exp = localStorage.getItem('temp_unlock_hino_' + hinoNum);
+            if (!exp) return false;
+            if (Date.now() < parseInt(exp, 10)) {
+                return true; // Ainda dentro da 1 hora
+            } else {
+                localStorage.removeItem('temp_unlock_hino_' + hinoNum); // Expirou
+                return false;
+            }
+        } catch(e) {
+            return false;
+        }
+    };
+
+    // Exibe o anúncio de vídeo recompensado
+    window.watchAdToUnlockHino = async function(hinoNum, onSuccessCallback) {
+        if (!ironSourceSDK) {
+            toast('Vídeos de anúncios disponíveis apenas no app instalado (APK).');
+            return;
+        }
+
+        try {
+            toast('Carregando anúncio...', 'success');
+            const res = await ironSourceSDK.showRewardedVideo({
+                placementName: PRO_CFG.unityRewardedUnitId || 'Rewarded_Hino_1Hora'
+            });
+
+            // Se assistiu ao vídeo completo: libera por 1 hora (60 min)
+            if (res && (res.completed || res.rewarded)) {
+                const oneHour = Date.now() + (60 * 60 * 1000);
+                localStorage.setItem('temp_unlock_hino_' + hinoNum, oneHour);
+                
+                toast('✓ Hino liberado por 1 hora!', 'success');
+                if (typeof onSuccessCallback === 'function') onSuccessCallback();
+            }
+        } catch (err) {
+            console.error('Erro no vídeo recompensado:', err);
+            toast('Anúncio indisponível no momento. Tente novamente em instantes.');
+        }
+    };
+
+    // Ajusta a verificação da limitação do Hino (Pro, Grátis ou Liberado por 1h)
+    const originalProLimit = window.proLimit;
+    window.proLimit = function() {
+        if (PRO.ok) return Infinity; // Usuário Pro Vitalício
+        if (state.hinoN && window.isHinoTempUnlocked(state.hinoN)) {
+            return Infinity; // Liberado temporariamente por 1 hora via vídeo
+        }
+        return originalProLimit ? originalProLimit() : Infinity;
+    };
+
+    // Inicializar quando a página estiver carregada
+    window.addEventListener('DOMContentLoaded', initUnityAds);
+})();
+</script>
 </body>
 </html>
