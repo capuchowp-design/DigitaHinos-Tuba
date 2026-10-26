@@ -9,7 +9,6 @@
     "@capacitor/device": "^7.0.0",
     "@capacitor/filesystem": "^7.0.0",
     "@capacitor/share": "^7.0.0",
-    "@capacitor-community/ironsource": "^7.0.0",
     "@fontsource-variable/inter": "^5.0.0",
     "tone": "14.8.49"
   },
