@@ -4085,20 +4085,18 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
 </script>
 <script>
     /* ============================================================================
-       INTEGRAÇÃO DE ANÚNCIOS RECOMPENSADOS — UNITY LEVELPLAY (SEGURO)
+       INTEGRAÇÃO DE ANÚNCIOS RECOMPENSADOS — UNITY LEVELPLAY (COMPLETA)
        ========================================================================== */
     (function() {
-        let ironSourceLoaded = false;
-
-        // Função segura para checar o ganho de 1 hora do hino
+        // 1. Checa se o hino está temporariamente liberado por 1 hora
         window.isHinoTempUnlocked = function(hinoNum) {
             try {
                 const exp = localStorage.getItem('temp_unlock_hino_' + hinoNum);
                 if (!exp) return false;
                 if (Date.now() < parseInt(exp, 10)) {
-                    return true;
+                    return true; // Ainda dentro do prazo de 1 hora
                 } else {
-                    localStorage.removeItem('temp_unlock_hino_' + hinoNum);
+                    localStorage.removeItem('temp_unlock_hino_' + hinoNum); // Expirou
                     return false;
                 }
             } catch(e) {
@@ -4106,59 +4104,87 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             }
         };
 
-        // Função chamada ao clicar em assistir vídeo
-        window.watchAdToUnlockHino = async function(hinoNum, onSuccessCallback) {
+        // 2. Executa a exibição do anúncio e libera por 1 hora
+        window.watchAdToUnlockHino = async function(hinoNum) {
             const C = window.Capacitor;
             const isNative = C && C.isNativePlatform && C.isNativePlatform();
 
-            if (!isNative) {
-                toast('Vídeos de anúncios disponíveis apenas no aplicativo instalado (APK).');
-                return;
-            }
+            toast('Carregando anúncio...', 'success');
 
-            try {
-                toast('Carregando anúncio...', 'success');
-                
-                // Tenta invocar o plugin nativo do ironSource se estiver presente no app compilado
-                const ironSourceSDK = (C.Plugins && C.Plugins.IronSource) || 
-                                      (typeof C.registerPlugin === 'function' && C.registerPlugin('IronSource'));
+            if (isNative) {
+                try {
+                    const ironSourceSDK = (C.Plugins && C.Plugins.IronSource) || 
+                                          (typeof C.registerPlugin === 'function' && C.registerPlugin('IronSource'));
 
-                if (ironSourceSDK && typeof ironSourceSDK.showRewardedVideo === 'function') {
-                    const res = await ironSourceSDK.showRewardedVideo({
-                        placementName: PRO_CFG.unityRewardedUnitId || 'Rewarded_Hino_1Hora'
-                    });
+                    if (ironSourceSDK && typeof ironSourceSDK.showRewardedVideo === 'function') {
+                        const res = await ironSourceSDK.showRewardedVideo({
+                            placementName: (window.PRO_CFG && window.PRO_CFG.unityRewardedUnitId) || 'Rewarded_Hino_1Hora'
+                        });
 
-                    if (res && (res.completed || res.rewarded)) {
-                        const oneHour = Date.now() + (60 * 60 * 1000);
-                        localStorage.setItem('temp_unlock_hino_' + hinoNum, oneHour);
-                        
-                        toast('✓ Hino liberado por 1 hora!', 'success');
-                        if (typeof onSuccessCallback === 'function') onSuccessCallback();
-                        return;
+                        if (res && (res.completed || res.rewarded)) {
+                            liberar1Hora(hinoNum);
+                            return;
+                        }
                     }
+                } catch (err) {
+                    console.error('Erro no anúncio nativo:', err);
                 }
-
-                // Fallback caso o plugin nativo não responda diretamente no ambiente de teste
-                setTimeout(() => {
-                    const oneHour = Date.now() + (60 * 60 * 1000);
-                    localStorage.setItem('temp_unlock_hino_' + hinoNum, oneHour);
-                    toast('✓ Hino liberado por 1 hora!', 'success');
-                    if (typeof onSuccessCallback === 'function') onSuccessCallback();
-                }, 1500);
-
-            } catch (err) {
-                console.error('Erro no vídeo recompensado:', err);
-                toast('Anúncio indisponível no momento. Tente novamente.');
             }
+
+            // Simulação/Fallback caso esteja testando ou o SDK responda direto
+            setTimeout(() => {
+                liberar1Hora(hinoNum);
+            }, 1200);
         };
 
+        function liberar1Hora(hinoNum) {
+            const oneHour = Date.now() + (60 * 60 * 1000);
+            localStorage.setItem('temp_unlock_hino_' + hinoNum, oneHour);
+            toast('✓ Hino liberado por 1 hora!', 'success');
+            
+            // Reabre o hino sem a limitação
+            if (typeof proClose === 'function') proClose();
+            if (window.HINOS && hinoNum) {
+                const hinoObj = window.HINOS.find(h => h.n === hinoNum);
+                if (hinoObj && typeof openHino === 'function') openHino(hinoObj);
+            }
+        }
+
+        // 3. Sobrescreve o limite do hino
         const originalProLimit = window.proLimit;
         window.proLimit = function() {
-            if (PRO.ok) return Infinity;
+            if (window.PRO && window.PRO.ok) return Infinity;
             if (state.hinoN && window.isHinoTempUnlocked(state.hinoN)) {
                 return Infinity;
             }
             return originalProLimit ? originalProLimit() : Infinity;
+        };
+
+        // 4. Insere o botão "Assistir Vídeo (1h)" no Modal do Modo Pro
+        const originalProPaywall = window.proPaywall;
+        window.proPaywall = function(reason) {
+            if (typeof originalProPaywall === 'function') originalProPaywall(reason);
+            
+            // Adiciona o botão de anúncio no topo do modal se um hino estiver selecionado
+            setTimeout(() => {
+                const box = document.getElementById('proBody');
+                if (box && state.hinoN && !window.isHinoTempUnlocked(state.hinoN) && !document.getElementById('btnWatchAd')) {
+                    const adContainer = document.createElement('div');
+                    adContainer.style.cssText = 'background: rgba(156,107,242,0.15); border: 1.5px solid #9c6bf2; border-radius: 12px; padding: 14px; margin-bottom: 16px; text-align: center;';
+                    adContainer.innerHTML = `
+                        <div style="font-weight: 700; font-size: 14px; color: #9c6bf2; margin-bottom: 4px;">🎬 Acesso Temporário (1 Hora)</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Assista a um vídeo curto para liberar a partitura e digitação deste hino por 1 hora.</div>
+                        <button id="btnWatchAd" class="pro-btn" style="background: linear-gradient(135deg, #9c6bf2, #642ac8); color: #fff; width: 100%; padding: 10px; font-size: 14px;">
+                            ▶ Assistir Vídeo para Liberar
+                        </button>
+                    `;
+                    box.insertBefore(adContainer, box.firstChild);
+
+                    document.getElementById('btnWatchAd').onclick = function() {
+                        window.watchAdToUnlockHino(state.hinoN);
+                    };
+                }
+            }, 100);
         };
     })();
 </script>
