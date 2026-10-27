@@ -10,7 +10,7 @@ window.PRO_CFG = {
   freeHinos: 50,                                
   previewSec: 15,                               
 
-  // Insira a sua App Key da Unity abaixo entre as aspas simples:
+  // Preencha com a sua App Key obtida no painel da Unity LevelPlay
   unityAppKey: '578vzxwbfohap9ce', 
   unityRewardedUnitId: 'Recompensado_Hino_1Hora'
 };
