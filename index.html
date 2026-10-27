@@ -4085,18 +4085,18 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
 </script>
 <script>
     /* ============================================================================
-       INTEGRAÇÃO DE ANÚNCIOS RECOMPENSADOS — UNITY LEVELPLAY (COMPLETA)
+       GERENCIAMENTO DE ACESSO TEMPORÁRIO E ANÚNCIOS (DIGITAHINOS)
        ========================================================================== */
     (function() {
-        // 1. Checa se o hino está temporariamente liberado por 1 hora
+        // Verifica se o hino está liberado por 1 hora
         window.isHinoTempUnlocked = function(hinoNum) {
             try {
                 const exp = localStorage.getItem('temp_unlock_hino_' + hinoNum);
                 if (!exp) return false;
                 if (Date.now() < parseInt(exp, 10)) {
-                    return true; // Ainda dentro do prazo de 1 hora
+                    return true;
                 } else {
-                    localStorage.removeItem('temp_unlock_hino_' + hinoNum); // Expirou
+                    localStorage.removeItem('temp_unlock_hino_' + hinoNum);
                     return false;
                 }
             } catch(e) {
@@ -4104,12 +4104,12 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             }
         };
 
-        // 2. Executa a exibição do anúncio e libera por 1 hora
+        // Função executada ao clicar no botão de assistir anúncio
         window.watchAdToUnlockHino = async function(hinoNum) {
+            toast('Carregando anúncio...', 'success');
+
             const C = window.Capacitor;
             const isNative = C && C.isNativePlatform && C.isNativePlatform();
-
-            toast('Carregando anúncio...', 'success');
 
             if (isNative) {
                 try {
@@ -4118,31 +4118,30 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
 
                     if (ironSourceSDK && typeof ironSourceSDK.showRewardedVideo === 'function') {
                         const res = await ironSourceSDK.showRewardedVideo({
-                            placementName: (window.PRO_CFG && window.PRO_CFG.unityRewardedUnitId) || 'Rewarded_Hino_1Hora'
+                            placementName: (window.PRO_CFG && window.PRO_CFG.unityRewardedUnitId) || 'Recompensado_Hino_1Hora'
                         });
 
                         if (res && (res.completed || res.rewarded)) {
-                            liberar1Hora(hinoNum);
+                            concluirLiberacao(hinoNum);
                             return;
                         }
                     }
                 } catch (err) {
-                    console.error('Erro no anúncio nativo:', err);
+                    console.error('Erro ao exibir anúncio nativo:', err);
                 }
             }
 
-            // Simulação/Fallback caso esteja testando ou o SDK responda direto
+            // Fallback para testes ou caso o SDK demore
             setTimeout(() => {
-                liberar1Hora(hinoNum);
-            }, 1200);
+                concluirLiberacao(hinoNum);
+            }, 1000);
         };
 
-        function liberar1Hora(hinoNum) {
+        function concluirLiberacao(hinoNum) {
             const oneHour = Date.now() + (60 * 60 * 1000);
             localStorage.setItem('temp_unlock_hino_' + hinoNum, oneHour);
             toast('✓ Hino liberado por 1 hora!', 'success');
             
-            // Reabre o hino sem a limitação
             if (typeof proClose === 'function') proClose();
             if (window.HINOS && hinoNum) {
                 const hinoObj = window.HINOS.find(h => h.n === hinoNum);
@@ -4150,7 +4149,7 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             }
         }
 
-        // 3. Sobrescreve o limite do hino
+        // Regra para liberar o limite do hino
         const originalProLimit = window.proLimit;
         window.proLimit = function() {
             if (window.PRO && window.PRO.ok) return Infinity;
@@ -4160,12 +4159,11 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             return originalProLimit ? originalProLimit() : Infinity;
         };
 
-        // 4. Insere o botão "Assistir Vídeo (1h)" no Modal do Modo Pro
+        // Insere o botão de assistir vídeo na tela de bloqueio
         const originalProPaywall = window.proPaywall;
         window.proPaywall = function(reason) {
             if (typeof originalProPaywall === 'function') originalProPaywall(reason);
             
-            // Adiciona o botão de anúncio no topo do modal se um hino estiver selecionado
             setTimeout(() => {
                 const box = document.getElementById('proBody');
                 if (box && state.hinoN && !window.isHinoTempUnlocked(state.hinoN) && !document.getElementById('btnWatchAd')) {
@@ -4174,7 +4172,7 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
                     adContainer.innerHTML = `
                         <div style="font-weight: 700; font-size: 14px; color: #9c6bf2; margin-bottom: 4px;">🎬 Acesso Temporário (1 Hora)</div>
                         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Assista a um vídeo curto para liberar a partitura e digitação deste hino por 1 hora.</div>
-                        <button id="btnWatchAd" class="pro-btn" style="background: linear-gradient(135deg, #9c6bf2, #642ac8); color: #fff; width: 100%; padding: 10px; font-size: 14px;">
+                        <button id="btnWatchAd" style="background: linear-gradient(135deg, #9c6bf2, #642ac8); color: #fff; width: 100%; padding: 10px; font-size: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;">
                             ▶ Assistir Vídeo para Liberar
                         </button>
                     `;
@@ -4188,5 +4186,8 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
         };
     })();
 </script>
+</body>
+</html>
+
 </body>
 </html>
