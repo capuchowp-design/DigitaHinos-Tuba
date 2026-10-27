@@ -4083,11 +4083,42 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
 })();
 
 </script>
-<script>
+            <script>
     /* ============================================================================
-       GERENCIAMENTO DE ACESSO TEMPORÁRIO E ANÚNCIOS (DIGITAHINOS)
+       INTEGRAÇÃO DE ANÚNCIOS RECOMPENSADOS — UNITY LEVELPLAY (CAPACITOR)
        ========================================================================== */
     (function() {
+        let ironSourcePlugin = null;
+        let isAdReady = false;
+
+        // Inicializa o SDK do LevelPlay/ironSource no Android
+        async function initIronSource() {
+            const C = window.Capacitor;
+            if (C && C.isNativePlatform && C.isNativePlatform()) {
+                try {
+                    ironSourcePlugin = (C.Plugins && C.Plugins.IronSource) || 
+                                       (typeof C.registerPlugin === 'function' && C.registerPlugin('IronSource'));
+
+                    if (ironSourcePlugin && window.PRO_CFG && window.PRO_CFG.unityAppKey) {
+                        // Inicializa a App Key da Unity
+                        await ironSourcePlugin.initialize({
+                            appKey: window.PRO_CFG.unityAppKey,
+                            userConsent: true
+                        });
+
+                        // Garante o carregamento do Vídeo Recompensado
+                        if (typeof ironSourcePlugin.loadRewardedVideo === 'function') {
+                            await ironSourcePlugin.loadRewardedVideo();
+                        }
+                        isAdReady = true;
+                        console.log('Unity LevelPlay inicializado e pronto.');
+                    }
+                } catch (e) {
+                    console.error('Erro ao inicializar Unity LevelPlay:', e);
+                }
+            }
+        }
+
         // Verifica se o hino está liberado por 1 hora
         window.isHinoTempUnlocked = function(hinoNum) {
             try {
@@ -4104,37 +4135,33 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             }
         };
 
-        // Função executada ao clicar no botão de assistir anúncio
+        // Função para carregar e exibir o anúncio de vídeo
         window.watchAdToUnlockHino = async function(hinoNum) {
             toast('Carregando anúncio...', 'success');
 
             const C = window.Capacitor;
             const isNative = C && C.isNativePlatform && C.isNativePlatform();
 
-            if (isNative) {
+            if (isNative && ironSourcePlugin) {
                 try {
-                    const ironSourceSDK = (C.Plugins && C.Plugins.IronSource) || 
-                                          (typeof C.registerPlugin === 'function' && C.registerPlugin('IronSource'));
+                    // Exibe o vídeo recompensado
+                    const res = await ironSourcePlugin.showRewardedVideo({
+                        placementName: (window.PRO_CFG && window.PRO_CFG.unityRewardedUnitId) || 'Recompensado_Hino_1Hora'
+                    });
 
-                    if (ironSourceSDK && typeof ironSourceSDK.showRewardedVideo === 'function') {
-                        const res = await ironSourceSDK.showRewardedVideo({
-                            placementName: (window.PRO_CFG && window.PRO_CFG.unityRewardedUnitId) || 'Recompensado_Hino_1Hora'
-                        });
-
-                        if (res && (res.completed || res.rewarded)) {
-                            concluirLiberacao(hinoNum);
-                            return;
-                        }
+                    // Quando o usuário termina de ver o vídeo completo
+                    if (res && (res.completed || res.rewarded)) {
+                        concluirLiberacao(hinoNum);
+                        return;
                     }
                 } catch (err) {
-                    console.error('Erro ao exibir anúncio nativo:', err);
+                    console.error('Erro ao exibir vídeo da Unity:', err);
+                    toast('Vídeo indisponível no momento. Tente novamente em instantes.');
+                    return;
                 }
+            } else {
+                toast('Anúncios de vídeo disponíveis no app Android instalado.');
             }
-
-            // Fallback para testes ou caso o SDK demore
-            setTimeout(() => {
-                concluirLiberacao(hinoNum);
-            }, 1000);
         };
 
         function concluirLiberacao(hinoNum) {
@@ -4149,7 +4176,7 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             }
         }
 
-        // Regra para liberar o limite do hino
+        // Sobrescreve a regra do limite de hino
         const originalProLimit = window.proLimit;
         window.proLimit = function() {
             if (window.PRO && window.PRO.ok) return Infinity;
@@ -4159,7 +4186,7 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
             return originalProLimit ? originalProLimit() : Infinity;
         };
 
-        // Insere o botão de assistir vídeo na tela de bloqueio
+        // Insere o botão na janela do Modo Pro
         const originalProPaywall = window.proPaywall;
         window.proPaywall = function(reason) {
             if (typeof originalProPaywall === 'function') originalProPaywall(reason);
@@ -4184,10 +4211,10 @@ window.__pb={pbBuildScore,renderWav,wavBlob,makePdf,svgToJpeg,snapshot,apply,qui
                 }
             }, 100);
         };
+
+        // Inicializar quando a página carregar
+        window.addEventListener('DOMContentLoaded', initIronSource);
     })();
 </script>
-</body>
-</html>
-
 </body>
 </html>
