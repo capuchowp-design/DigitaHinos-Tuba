@@ -5,3 +5,5 @@ Visualizador MIDI com tuba em Si♭ animada (4 pistões, tabela de digitação c
 - Compositor com exportação WAV, MIDI, JSON e partitura em PDF (clave de Fá, com as válvulas sob cada nota); projetos salvos no navegador, autosave e importação de MIDI.
 - Publicação: suba os arquivos no GitHub Pages. A cada versão nova, mude `CACHE_NAME` em `sw.js`.
 - Válvulas: 1 = −2 semitons, 2 = −1, 3 = −3, 4 = −5. Alcance: Dó1 a Fá4 (notas fora dele são dobradas de oitava).
+- Partitura (PDF e partitura dinâmica da tela inicial): desenho dos pistões sob cada nota (verde = apertado) com o número da combinação; segue a versão escolhida da tuba (3 ou 4 pistões).
+- Repetições: as casas são lidas pelo número impresso ("1.2.", "3."); a repetição volta até completar todas as passagens (ex.: casas 1.2. + 3. = 3 passagens e a 3ª casa segue para o coro).
